@@ -6,10 +6,8 @@
 ---
 
 ## ⏱️ Current focus
-**App is fully working** on both emulator and Samsung S23 FE (2026-05-31). Map shows real CNE prices
-with green→red color tiers, Google Sign-In works, 13,727 stations ingested every 30 min. Only
-remaining work: F9 device test (Navegar deep-link), F8 backend (Maps server key), and F11 (signed
-release APK).
+**F1–F10 all complete.** App fully working on emulator + Samsung S23 FE. Only remaining: **F11 —
+signed release APK/AAB** (generate keystore, wire signingConfig, build release).
 
 ## ▶️ Next step (ordered — do these in sequence)
 
@@ -113,8 +111,8 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 | F5 | Price color tiers (green→red markers) | ✅ | 2026-05-31 | Confirmed visually — green/yellow/orange/red markers showing on map. |
 | F6 | Location + Haversine ranking, filters | ✅ | 2026-05-31 | Location, fuel type + Top N filters working on both devices. |
 | F7 | Google Sign-In + App Check | ✅ | 2026-05-31 | Working on emulator + real device. Two debug tokens registered. |
-| F8 | Places search + Directions ETA gateway | 🟨 | 2026-05-31 | Android done. 🔵 Backend needs `MAPS_SERVER_KEY` secret + uncomment + redeploy (Step 6 above). |
-| F9 | Navigation deep-link (Google Maps) | 🟨 | 2026-05-31 | Code done. Test by tapping "Navegar" on a station — should open Google Maps navigation. |
+| F8 | Places search + Directions ETA gateway | ✅ | 2026-05-31 | Working on S23 FE — search bar + "Ver ruta exacta" confirmed. |
+| F9 | Navigation deep-link (Google Maps) | ✅ | 2026-05-31 | Confirmed working on S23 FE. |
 | F10 | Polish, error states, offline fallback | ✅ | 2026-05-31 | Done. |
 | F11 | Signed release APK/AAB | ⬜ | — | Last remaining step — see Step 7 in Next Steps above. |
 
