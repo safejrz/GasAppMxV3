@@ -6,21 +6,22 @@
 ---
 
 ## ⏱️ Current focus
-Project `gasappmxv3` created. Android app ported + **UI reworked (full-screen map + draggable bottom
-sheet)** and **auth implemented (Google Sign-In gate + App Check + sign-out)**. All Android code is
-written but **uncompiled** — needs Android Studio + `google-services.json`. Backend deploy is blocked on
-**Blaze**.
+Backend live on **Blaze**: `cneIngest` deployed, Storage + Firestore rules deployed. Awaiting the first
+30-min scheduler tick to confirm `stations/latest.json.gz` is written. Android code (F3–F10) is fully
+written — needs first build in Android Studio to confirm compilation.
 
 ## ▶️ Next step
-1. **User:** upgrade `gasappmxv3` to **Blaze** + **$10 budget alert** (console — see manual steps).
-2. **User:** register Firebase **Android app** (package `mx.gasappmx`), enable **Google** sign-in
-   provider, register debug **SHA-1** + **App Check debug token**, drop `google-services.json` into
-   `android/app/`. Then build in Android Studio — fix any compile errors this surfaces (first build of
-   uncompiled port).
-3. Once Blaze: Claude deploys rules + functions, sets `MAPS_SERVER_KEY`, confirms `cneIngest` writes
-   `stations/latest.json.gz` (F2 live).
-4. F8: wire the app's Places search + Directions ETA to the gated callable functions.
-5. F10/F11: polish, then signed APK.
+1. **Verify F2:** check Firebase console Storage for `stations/latest.json.gz` — should appear within 30
+   min of the last deploy (~06:07 UTC). If it doesn't appear, check Cloud Run logs for `cneingest` in
+   Google Cloud Logging.
+2. **User (for F7/F8):** register Firebase Android app (`mx.gasappmx`), enable Google sign-in provider,
+   download `google-services.json` → `android/app/`, register debug SHA-1 + App Check debug token.
+3. **First Android Studio build** — fix any compile errors (first build of uncompiled code). Paste errors
+   here if any.
+4. **F8 backend:** once you have a Maps server API key, run:
+   `firebase functions:secrets:set MAPS_SERVER_KEY` then uncomment the places/directions exports in
+   `firebase/functions/src/index.ts` and redeploy.
+5. **F11:** generate signing keystore + build signed APK/AAB.
 
 ## 🏃 How to run what exists today
 - **Docs only so far.** No app/functions are runnable yet.
@@ -36,15 +37,15 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 | ID | Feature | Status | Updated | Notes |
 |----|---------|--------|---------|-------|
 | F1 | Scaffold & infra (repo, docs, gitignore, GitHub push) | 🟨 | 2026-05-30 | Local scaffold + functions skeleton done; cloud setup 🔵 (needs `firebase login`) |
-| F2 | CNE data pipeline (`cneIngest` → Storage blob) | 🟨 | 2026-05-30 | Parser **validated on live feed: 13,727 stations**. Needs deploy + scheduler + Storage bucket. Writes gzipped JSON to Storage (not per-station Firestore) for cost. |
+| F2 | CNE data pipeline (`cneIngest` → Storage blob) | 🟨 | 2026-05-31 | **Deployed** to gasappmxv3 (v2 nodejs20, scheduled every 30 min). Firestore + Storage rules live. **Awaiting first scheduler tick** to confirm `stations/latest.json.gz` is written. Verify at: Firebase console → Storage. |
 | F3 | App shell & big-map UI (full-screen map + bottom sheet) | 🟨 | 2026-05-30 | **Done in code:** `BottomSheetScaffold` — near-full-screen `GoogleMap` + draggable results/detail sheet, top overlay w/ title + Salir. Needs compile/visual verify. |
 | F4 | Station data source (`CloudStationRepository`, ranking) | 🟨 | 2026-05-30 | Written: downloads Storage `latest.json.gz`, gunzips, Haversine + cheapest-first rank on-device. Needs live data + auth to verify. |
 | F5 | Price color tiers (green→red markers) | ⬜ | — | Port `MarkerPriceTier` + `PriceLabelBitmapFactory` |
 | F6 | Location & ranking (Haversine, fuel + Top-N filters) | ⬜ | — | FusedLocation + on-device sort |
 | F7 | Auth (Google Sign-In + App Check) | 🟨 | 2026-05-30 | **Done in code:** `GasApplication` installs App Check (debug/Play Integrity); `AuthManager` Google sign-in via Credential Manager; `SignInScreen` gate in `MainActivity`. Needs `google-services.json` + SHA-1 + debug token to run. |
-| F8 | Paid API gateway (Places + Directions + quota) | ⬜ | — | Conservative caps: 20 dir / 30 places per user/day |
+| F8 | Paid API gateway (Places + Directions + quota) | 🟨 | 2026-05-31 | Android side done: `FunctionsClient`, search bar in top overlay, Directions ETA in detail ("Ver ruta exacta"). Backend `places`/`directions` functions commented out — needs `MAPS_SERVER_KEY` secret set + uncomment + redeploy. |
 | F9 | Navigation deep-link (open Google Maps app) | 🟨 | 2026-05-30 | **Done in code:** `openGoogleMapsNavigation` (`google.navigation:q=`) + manifest `<queries>` for Android 11+ visibility. Needs device verify. |
-| F10 | Polish & resilience (states, offline cache, copy) | ⬜ | — | — |
+| F10 | Polish & resilience (states, offline cache, copy) | 🟨 | 2026-05-31 | Tests fixed. Loading spinner, error states, offline fallback (CloudStationRepository keeps last-good blob in memory). Spanish copy pass done in UI strings. |
 | F11 | Release (keystore, signed AAB/APK, verify cost guard) | ⬜ | — | Phase-1 finish line |
 
 ---
