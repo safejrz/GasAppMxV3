@@ -38,13 +38,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file(localSecrets.getProperty("RELEASE_STORE_FILE", "release.jks"))
+            storePassword = localSecrets.getProperty("RELEASE_STORE_PASSWORD", "")
+            keyAlias = localSecrets.getProperty("RELEASE_KEY_ALIAS", "")
+            keyPassword = localSecrets.getProperty("RELEASE_KEY_PASSWORD", "")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
