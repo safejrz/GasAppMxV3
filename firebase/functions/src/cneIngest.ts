@@ -13,7 +13,9 @@ const PRICES_URL =
   process.env.CNE_PRICES_URL ??
   "https://publicacionexterna.azurewebsites.net/publicaciones/prices";
 
-const DATASET_PATH = "stations/latest.json"; // gzipped JSON in the default Storage bucket
+// Gzipped JSON stored as opaque bytes (NO contentEncoding metadata) so the client always
+// gunzips deterministically and GCS never applies decompressive transcoding.
+const DATASET_PATH = "stations/latest.json.gz";
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
@@ -57,8 +59,8 @@ export const cneIngest = onSchedule(
       .bucket()
       .file(DATASET_PATH)
       .save(gzipped, {
-        contentType: "application/json",
-        metadata: { contentEncoding: "gzip", cacheControl: "no-cache" },
+        contentType: "application/gzip",
+        metadata: { cacheControl: "no-cache" },
       });
 
     await getFirestore().doc("meta/freshness").set({

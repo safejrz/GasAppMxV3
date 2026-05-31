@@ -77,17 +77,24 @@ Both share a `<places><place>…</place></places>` shape:
 ```
 
 The **places** feed carries name/cre_id/coordinates; the **prices** feed carries the `gas_price` entries.
-`cneIngest` fetches both, joins by `place_id`, normalizes, and writes to Firestore. (Reference parsers:
+`cneIngest` fetches both, joins by `place_id`, normalizes, and caches the result. (Reference parsers:
 V1 `~/git/GasAppMx/mobile/App.js` `parsePlaces`/`parsePrices`; V2
 `~/git/CodexGasAppMx/backend-service/.../CneFeedParser.kt`.)
 
-### Firestore data model
+### Data model
+
+The ~13.7k-station dataset is **not** stored per-document (that would blow past Firestore's free write
+tier at 48 ingests/day). Instead:
 
 ```
-stations/{placeId}     { name, creId, lat, lon, regular, premium, diesel, updatedAt }
-meta/freshness         { lastIngestAt, stationCount, source }
-usage/{uid}/days/{yyyy-mm-dd}  { directions, places }   # server-written only
+Cloud Storage:  stations/latest.json.gz   # one gzipped JSON blob: { updatedAt, source, count, stations[] }
+Firestore:      meta/freshness            { lastIngestAt, lastIngestIso, stationCount, source, datasetPath }
+Firestore:      usage/{uid}/days/{yyyy-mm-dd}  { directions, places }   # server-written only
 ```
+
+The app downloads the blob (authed read), gunzips it, and runs Haversine ranking on-device
+(`CloudStationRepository`). The blob is stored as opaque gzip (no `contentEncoding` metadata) so GCS
+never applies decompressive transcoding and the client always gunzips deterministically.
 
 ---
 
@@ -101,22 +108,23 @@ npm install
 npm run build        # tsc type-check / compile to lib/
 ```
 
-Functions:
-- `cneIngest` — **scheduled** (every 30 min via Cloud Scheduler) — fetch + parse + write `stations` +
-  `meta/freshness`. Idempotent; keeps last-good data if a fetch fails.
-- `places` — **callable** — verifies Auth + App Check, checks/increments the daily Places quota, proxies
-  Places search with `MAPS_SERVER_KEY`, returns results or a 429-style error when over quota.
+Functions (TypeScript):
+- `cneIngest` — **scheduled** (every 30 min via Cloud Scheduler) — fetch + parse + write the gzipped
+  blob to Storage + `meta/freshness`. Idempotent; keeps last-good data if a fetch fails or yields 0.
+- `placesSearch` — **callable** — verifies Auth + App Check, checks/increments the daily Places quota,
+  proxies Places Text Search with `MAPS_SERVER_KEY`, returns results or a resource-exhausted error.
 - `directions` — **callable** — same gating, for real driving ETA to a selected station.
 - `quota.ts` — shared helper enforcing the per-user daily caps (default **20 directions / 30 places**).
 
-Deploy: `firebase deploy --only functions,firestore:rules`.
+Set the server key secret first: `firebase functions:secrets:set MAPS_SERVER_KEY`.
+Deploy: `firebase deploy --only functions,firestore:rules,storage:rules`.
 
-Local dev: `firebase emulators:start` (Functions + Firestore). Android emulator reaches the host at
-`10.0.2.2`.
+Local dev: `firebase emulators:start` (Functions + Firestore + Storage + Auth). Android emulator reaches
+the host at `10.0.2.2`.
 
-### Firestore security rules (summary)
-- `stations/**`, `meta/**`: **read** only for authenticated users; **no client writes**.
-- `usage/**`: no client access — written only by functions (Admin SDK bypasses rules).
+### Security rules (summary)
+- Storage `stations/**` and Firestore `meta/**`: **read** only for authenticated users; no client writes.
+- Firestore `usage/**`: no client access — written only by functions (Admin SDK bypasses rules).
 
 ---
 
@@ -124,7 +132,9 @@ Local dev: `firebase emulators:start` (Functions + Firestore). Android emulator 
 
 Location: `android/`. Built on V2's Compose app (`~/git/CodexGasAppMx/app`).
 
-1. Put `google-services.json` (from Firebase console) in `android/app/` (gitignored).
+1. In the Firebase console, register an **Android app** with package **`mx.gasappmx`**, download
+   `google-services.json`, and put it in `android/app/` (gitignored). The `google-services` Gradle
+   plugin **fails the build if this file is missing**, so add it before the first build.
 2. Put the Android SDK Maps key in `android/secrets.properties` (gitignored), injected into the manifest:
    ```
    GOOGLE_MAPS_API_KEY=AIza...androidKey
