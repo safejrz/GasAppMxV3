@@ -127,6 +127,11 @@ class MainActivity : ComponentActivity() {
             onStationDetailDismissed = viewModel::onStationDetailDismissed,
             onNavigateToStation = ::openGoogleMapsNavigation,
             onRequestLocation = requestLocation,
+            onSearchQueryChange = viewModel::onSearchQueryChange,
+            onSearchSubmit = viewModel::onSearchSubmit,
+            onSearchResultSelected = viewModel::onSearchResultSelected,
+            onSearchDismissed = viewModel::onSearchDismissed,
+            onDirectionsRequested = viewModel::onDirectionsRequested,
             userLabel = userLabel,
             onSignOut = { scope.launch { authManager.signOut() } },
         )

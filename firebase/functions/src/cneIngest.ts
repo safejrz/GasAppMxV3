@@ -63,13 +63,18 @@ export const cneIngest = onSchedule(
         metadata: { cacheControl: "no-cache" },
       });
 
-    await getFirestore().doc("meta/freshness").set({
-      lastIngestAt: FieldValue.serverTimestamp(),
-      lastIngestIso: dataset.updatedAt,
-      stationCount: dataset.count,
-      source: dataset.source,
-      datasetPath: DATASET_PATH,
-    });
+    // Freshness metadata is best-effort: don't fail the ingest if Firestore isn't set up yet.
+    try {
+      await getFirestore().doc("meta/freshness").set({
+        lastIngestAt: FieldValue.serverTimestamp(),
+        lastIngestIso: dataset.updatedAt,
+        stationCount: dataset.count,
+        source: dataset.source,
+        datasetPath: DATASET_PATH,
+      });
+    } catch (e) {
+      logger.warn("Skipped meta/freshness write (Firestore not ready?)", e);
+    }
 
     logger.info(`CNE ingest ok: ${stations.length} stations cached to ${DATASET_PATH}`);
   }

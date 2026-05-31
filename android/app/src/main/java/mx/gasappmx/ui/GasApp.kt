@@ -1,5 +1,6 @@
 package mx.gasappmx.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,7 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -43,11 +50,12 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import mx.gasappmx.data.DirectionsResult
+import mx.gasappmx.data.PlaceResult
 import mx.gasappmx.model.FuelType
 import mx.gasappmx.model.GasStation
 import mx.gasappmx.model.ResultLimit
 
-/** Fallback map center (Guadalajara) shown until the user's location is available. */
 private val DEFAULT_CENTER = LatLng(20.6597, -103.3496)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +68,11 @@ fun GasApp(
     onStationDetailDismissed: () -> Unit,
     onNavigateToStation: (GasStation) -> Unit,
     onRequestLocation: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    onSearchResultSelected: (PlaceResult) -> Unit,
+    onSearchDismissed: () -> Unit,
+    onDirectionsRequested: () -> Unit,
     userLabel: String?,
     onSignOut: () -> Unit,
 ) {
@@ -70,16 +83,13 @@ fun GasApp(
         ),
     )
 
-    // Expand the sheet to show the full detail when a station is selected.
     LaunchedEffect(state.selectedStation?.stationId) {
-        if (state.selectedStation != null) {
-            scaffoldState.bottomSheetState.expand()
-        }
+        if (state.selectedStation != null) scaffoldState.bottomSheetState.expand()
     }
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 260.dp,
+        sheetPeekHeight = 280.dp,
         sheetContent = {
             SheetContent(
                 state = state,
@@ -89,49 +99,149 @@ fun GasApp(
                 onStationDetailDismissed = onStationDetailDismissed,
                 onNavigateToStation = onNavigateToStation,
                 onRequestLocation = onRequestLocation,
+                onDirectionsRequested = onDirectionsRequested,
             )
         },
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             NearbyMap(state = state, onStationSelected = onStationSelected)
-            TopOverlay(userLabel = userLabel, onSignOut = onSignOut)
+            TopOverlay(
+                state = state,
+                userLabel = userLabel,
+                onSignOut = onSignOut,
+                onSearchQueryChange = onSearchQueryChange,
+                onSearchSubmit = onSearchSubmit,
+                onSearchResultSelected = onSearchResultSelected,
+                onSearchDismissed = onSearchDismissed,
+            )
         }
     }
 }
 
+// ── Top overlay: title + search bar ──────────────────────────────────────────
+
 @Composable
-private fun TopOverlay(userLabel: String?, onSignOut: () -> Unit) {
-    Surface(
+private fun TopOverlay(
+    state: GasUiState,
+    userLabel: String?,
+    onSignOut: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    onSearchResultSelected: (PlaceResult) -> Unit,
+    onSearchDismissed: () -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        // Title row
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 3.dp,
+            shadowElevation = 3.dp,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Gasolina MX",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (userLabel != null) {
-                    Text(text = userLabel, style = MaterialTheme.typography.bodySmall)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Gasolina MX",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (userLabel != null) {
+                        Text(text = userLabel, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                TextButton(onClick = onSignOut) { Text("Salir") }
+            }
+        }
+
+        // Search bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 3.dp,
+            shadowElevation = 3.dp,
+        ) {
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                placeholder = { Text("Buscar zona o dirección...") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = {
+                    keyboard?.hide()
+                    onSearchSubmit()
+                }),
+                trailingIcon = {
+                    if (state.searchQuery.isNotEmpty()) {
+                        TextButton(onClick = {
+                            keyboard?.hide()
+                            onSearchDismissed()
+                        }) { Text("✕") }
+                    }
+                },
+            )
+        }
+
+        // Search results dropdown
+        if (state.isSearching) {
+            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator()
+                    Text("Buscando...", style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            TextButton(onClick = onSignOut) {
-                Text("Salir")
+        } else if (state.searchResults.isNotEmpty()) {
+            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp, shadowElevation = 4.dp) {
+                LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                    items(state.searchResults) { place ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSearchResultSelected(place) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) {
+                            Text(text = place.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            if (place.address.isNotBlank()) {
+                                Text(text = place.address, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+        } else if (state.searchError != null) {
+            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp) {
+                Text(
+                    text = state.searchError,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
 }
+
+// ── Full-screen map ───────────────────────────────────────────────────────────
 
 @Composable
 private fun NearbyMap(
@@ -144,17 +254,22 @@ private fun NearbyMap(
         position = CameraPosition.fromLatLngZoom(center, 13.5f)
     }
 
-    LaunchedEffect(userLocation) {
-        if (userLocation != null) {
+    LaunchedEffect(state.searchCenter) {
+        state.searchCenter?.let {
             cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(
-                    LatLng(userLocation.latitude, userLocation.longitude), 13.5f,
-                ),
+                CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 13.5f),
             )
         }
     }
 
-    // When a station is tapped, pan the camera to it.
+    LaunchedEffect(userLocation) {
+        if (userLocation != null && state.searchCenter == null) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(LatLng(userLocation.latitude, userLocation.longitude), 13.5f),
+            )
+        }
+    }
+
     LaunchedEffect(state.selectedStation?.stationId) {
         state.selectedStation?.let {
             cameraPositionState.animate(CameraUpdateFactory.newLatLng(LatLng(it.latitude, it.longitude)))
@@ -177,27 +292,21 @@ private fun NearbyMap(
             val tier = tierMap[station.stationId] ?: MarkerPriceTier.NONE
             val priceText = station.prices[state.fuelType]?.let { "$%.2f".format(it) } ?: "—"
             val icon = remember(tier, isSelected, priceText) {
-                priceLabelBitmapDescriptor(
-                    context = context,
-                    priceText = priceText,
-                    tier = tier,
-                    isSelected = isSelected,
-                )
+                priceLabelBitmapDescriptor(context, priceText, tier, isSelected)
             }
             Marker(
-                state = MarkerState(position = LatLng(station.latitude, station.longitude)),
+                state = MarkerState(LatLng(station.latitude, station.longitude)),
                 title = station.name,
                 snippet = station.prices[state.fuelType]?.let { "$it MXN" } ?: "Precio no disponible",
                 icon = icon,
                 zIndex = if (isSelected) 1f else 0f,
-                onClick = {
-                    onStationSelected(station)
-                    false
-                },
+                onClick = { onStationSelected(station); false },
             )
         }
     }
 }
+
+// ── Bottom sheet content ──────────────────────────────────────────────────────
 
 @Composable
 private fun SheetContent(
@@ -208,6 +317,7 @@ private fun SheetContent(
     onStationDetailDismissed: () -> Unit,
     onNavigateToStation: (GasStation) -> Unit,
     onRequestLocation: () -> Unit,
+    onDirectionsRequested: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -217,20 +327,8 @@ private fun SheetContent(
             .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        FilterRow(
-            title = "Combustible",
-            selected = state.fuelType,
-            values = FuelType.entries,
-            label = { it.label },
-            onSelected = onFuelTypeChange,
-        )
-        FilterRow(
-            title = "Resultados",
-            selected = state.resultLimit,
-            values = ResultLimit.entries,
-            label = { it.label },
-            onSelected = onResultLimitChange,
-        )
+        FilterRow("Combustible", state.fuelType, FuelType.entries, { it.label }, onFuelTypeChange)
+        FilterRow("Resultados", state.resultLimit, ResultLimit.entries, { it.label }, onResultLimitChange)
 
         when {
             state.locationPermissionDenied -> LocationPermissionState(onRequestLocation)
@@ -240,10 +338,12 @@ private fun SheetContent(
             state.selectedStation != null -> StationDetail(
                 station = state.selectedStation,
                 fuelType = state.fuelType,
-                isLoading = state.isStationDetailLoading,
-                errorMessage = state.stationDetailErrorMessage,
+                directions = state.directions,
+                isDirectionsLoading = state.isDirectionsLoading,
+                directionsError = state.directionsError,
                 onDismiss = onStationDetailDismissed,
                 onNavigate = { onNavigateToStation(state.selectedStation) },
+                onRequestDirections = onDirectionsRequested,
             )
             state.stations.isEmpty() -> StatusMessage(
                 "No hay estaciones cercanas con precio ${state.fuelType.label}.",
@@ -253,13 +353,12 @@ private fun SheetContent(
     }
 }
 
+// ── Sub-composables ───────────────────────────────────────────────────────────
+
 @Composable
 private fun LocationPermissionState(onRequestLocation: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Activa el permiso de ubicación para buscar gasolineras cerca de ti.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text("Activa el permiso de ubicación para buscar gasolineras cerca de ti.", style = MaterialTheme.typography.bodyMedium)
         Button(onClick = onRequestLocation) { Text("Usar mi ubicación") }
     }
 }
@@ -267,10 +366,7 @@ private fun LocationPermissionState(onRequestLocation: () -> Unit) {
 @Composable
 private fun LocationWaitingState(onRequestLocation: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Necesitamos tu ubicación actual para ordenar estaciones por distancia.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text("Necesitamos tu ubicación actual para ordenar estaciones por distancia.", style = MaterialTheme.typography.bodyMedium)
         Button(onClick = onRequestLocation) { Text("Obtener ubicación") }
     }
 }
@@ -296,11 +392,8 @@ private fun <T> FilterRow(
     onSelected: (T) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = title, style = MaterialTheme.typography.labelLarge)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             values.forEach { value ->
                 FilterChip(
                     selected = value == selected,
@@ -313,41 +406,25 @@ private fun <T> FilterRow(
 }
 
 @Composable
-private fun StationList(
-    state: GasUiState,
-    onStationSelected: (GasStation) -> Unit,
-) {
+private fun StationList(state: GasUiState, onStationSelected: (GasStation) -> Unit) {
     LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 520.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(state.stations, key = { it.stationId }) { station ->
-            StationCard(
-                station = station,
-                fuelType = state.fuelType,
-                onClick = { onStationSelected(station) },
-            )
+            StationCard(station, state.fuelType) { onStationSelected(station) }
         }
     }
 }
 
 @Composable
-private fun StationCard(
-    station: GasStation,
-    fuelType: FuelType,
-    onClick: () -> Unit,
-) {
+private fun StationCard(station: GasStation, fuelType: FuelType, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(text = station.name, style = MaterialTheme.typography.titleMedium)
-            Text(text = "Distancia: ${station.distanceMeters} m", style = MaterialTheme.typography.bodyMedium)
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(station.name, style = MaterialTheme.typography.titleMedium)
+            Text("${station.distanceMeters} m", style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = "Precio ${fuelType.label}: ${station.prices[fuelType]?.let { "$$it MXN" } ?: "No disponible"}",
+                "Precio ${fuelType.label}: ${station.prices[fuelType]?.let { "$$it MXN" } ?: "No disponible"}",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -359,35 +436,52 @@ private fun StationCard(
 private fun StationDetail(
     station: GasStation,
     fuelType: FuelType,
-    isLoading: Boolean,
-    errorMessage: String?,
+    directions: DirectionsResult?,
+    isDirectionsLoading: Boolean,
+    directionsError: String?,
     onDismiss: () -> Unit,
     onNavigate: () -> Unit,
+    onRequestDirections: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(text = station.name, style = MaterialTheme.typography.titleMedium)
-            Text(text = "Distancia: ${station.distanceMeters} m", style = MaterialTheme.typography.bodyMedium)
-            if (isLoading) {
-                Text("Actualizando detalle...", style = MaterialTheme.typography.bodySmall)
-            }
-            errorMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(station.name, style = MaterialTheme.typography.titleMedium)
+            Text("${station.distanceMeters} m aprox.", style = MaterialTheme.typography.bodyMedium)
+
             FuelType.entries.forEach { type ->
                 Text(
-                    text = "${type.label}: ${station.prices[type]?.let { "$$it MXN" } ?: "No disponible"}",
-                    style = if (type == fuelType) {
-                        MaterialTheme.typography.bodyLarge
-                    } else {
-                        MaterialTheme.typography.bodyMedium
-                    },
+                    "${type.label}: ${station.prices[type]?.let { "$$it MXN" } ?: "No disponible"}",
+                    style = if (type == fuelType) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                     fontWeight = if (type == fuelType) FontWeight.SemiBold else FontWeight.Normal,
                 )
             }
+
+            // Directions ETA section
+            when {
+                isDirectionsLoading -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator()
+                    Text("Calculando ruta...", style = MaterialTheme.typography.bodySmall)
+                }
+                directions != null -> Text(
+                    "🚗 ${directions.durationText ?: "—"}  ·  ${directions.distanceMeters?.let { "${it / 1000.0} km" } ?: "—"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                directionsError != null -> Text(
+                    directionsError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = onDismiss, label = { Text("Cerrar") })
+                if (directions == null && !isDirectionsLoading) {
+                    AssistChip(onClick = onRequestDirections, label = { Text("Ver ruta exacta") })
+                }
                 Button(onClick = onNavigate) { Text("Navegar") }
             }
         }
@@ -397,17 +491,14 @@ private fun StationDetail(
 @Composable
 private fun StatusMessage(text: String) {
     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
-private fun ErrorState(
-    message: String,
-    onRetry: () -> Unit,
-) {
+private fun ErrorState(message: String, onRetry: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = message, style = MaterialTheme.typography.bodyMedium)
+        Text(message, style = MaterialTheme.typography.bodyMedium)
         Button(onClick = onRetry) { Text("Reintentar") }
     }
 }
