@@ -12,7 +12,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -23,10 +31,14 @@ import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import mx.gasappmx.auth.AuthManager
 import mx.gasappmx.data.CloudStationRepository
 import mx.gasappmx.model.GasStation
 import mx.gasappmx.ui.GasApp
 import mx.gasappmx.ui.GasViewModel
+import mx.gasappmx.ui.SignInScreen
 import mx.gasappmx.ui.UserLocation
 import mx.gasappmx.ui.theme.GasAppTheme
 
@@ -37,49 +49,87 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GasAppTheme {
-                val viewModel: GasViewModel = viewModel(
-                    factory = GasViewModelFactory(),
-                )
-                val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
-                val locationPermissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestMultiplePermissions(),
-                ) { permissions ->
-                    val hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-                    if (hasLocationPermission) {
-                        loadCurrentLocation(viewModel)
-                    } else {
-                        viewModel.onLocationPermissionDenied()
-                    }
-                }
-                val requestLocation = {
-                    if (hasLocationPermission()) {
-                        loadCurrentLocation(viewModel)
-                    } else {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            ),
-                        )
-                    }
+                val authManager = remember { AuthManager(applicationContext) }
+                val auth = remember { FirebaseAuth.getInstance() }
+                var currentUser by remember { mutableStateOf(auth.currentUser) }
+
+                DisposableEffect(Unit) {
+                    val listener = FirebaseAuth.AuthStateListener { currentUser = it.currentUser }
+                    auth.addAuthStateListener(listener)
+                    onDispose { auth.removeAuthStateListener(listener) }
                 }
 
-                LaunchedEffect(Unit) {
-                    requestLocation()
+                if (currentUser == null) {
+                    val scope = rememberCoroutineScope()
+                    val context = LocalContext.current
+                    var signingIn by remember { mutableStateOf(false) }
+                    var error by remember { mutableStateOf<String?>(null) }
+                    SignInScreen(
+                        isSigningIn = signingIn,
+                        errorMessage = error,
+                        onSignInClick = {
+                            signingIn = true
+                            error = null
+                            scope.launch {
+                                authManager.signInWithGoogle(context)
+                                    .onFailure { error = it.message ?: "No se pudo iniciar sesión." }
+                                signingIn = false
+                            }
+                        },
+                    )
+                } else {
+                    SignedInApp(
+                        authManager = authManager,
+                        userLabel = currentUser?.email ?: currentUser?.displayName,
+                    )
                 }
+            }
+        }
+    }
 
-                GasApp(
-                    state = uiState,
-                    onFuelTypeChange = viewModel::onFuelTypeChange,
-                    onResultLimitChange = viewModel::onResultLimitChange,
-                    onStationSelected = viewModel::onStationSelected,
-                    onStationDetailDismissed = viewModel::onStationDetailDismissed,
-                    onNavigateToStation = ::openGoogleMapsNavigation,
-                    onRequestLocation = requestLocation,
+    @Composable
+    private fun SignedInApp(authManager: AuthManager, userLabel: String?) {
+        val viewModel: GasViewModel = viewModel(factory = GasViewModelFactory())
+        val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+        val scope = rememberCoroutineScope()
+
+        val locationPermissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            val hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            if (hasLocationPermission) {
+                loadCurrentLocation(viewModel)
+            } else {
+                viewModel.onLocationPermissionDenied()
+            }
+        }
+        val requestLocation = {
+            if (hasLocationPermission()) {
+                loadCurrentLocation(viewModel)
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    ),
                 )
             }
         }
+
+        LaunchedEffect(Unit) { requestLocation() }
+
+        GasApp(
+            state = uiState,
+            onFuelTypeChange = viewModel::onFuelTypeChange,
+            onResultLimitChange = viewModel::onResultLimitChange,
+            onStationSelected = viewModel::onStationSelected,
+            onStationDetailDismissed = viewModel::onStationDetailDismissed,
+            onNavigateToStation = ::openGoogleMapsNavigation,
+            onRequestLocation = requestLocation,
+            userLabel = userLabel,
+            onSignOut = { scope.launch { authManager.signOut() } },
+        )
     }
 
     private fun openGoogleMapsNavigation(station: GasStation) {
