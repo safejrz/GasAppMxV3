@@ -6,10 +6,10 @@
 ---
 
 ## ⏱️ Current focus
-**First debug build succeeded** (2026-05-31, `app-debug.apk` 18 MB). All Android code compiles.
-Backend is live on Blaze — `cneIngest` scheduled and deployed. The app is not yet functional
-end-to-end because the Maps API key is a placeholder and Google Sign-In is not yet wired to real
-credentials.
+**App is fully working** on both emulator and Samsung S23 FE (2026-05-31). Map shows real CNE prices
+with green→red color tiers, Google Sign-In works, 13,727 stations ingested every 30 min. Only
+remaining work: F9 device test (Navegar deep-link), F8 backend (Maps server key), and F11 (signed
+release APK).
 
 ## ▶️ Next step (ordered — do these in sequence)
 
@@ -107,16 +107,16 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 | ID | Feature | Status | Updated | Notes |
 |----|---------|--------|---------|-------|
 | F1 | Scaffold & infra (repo, docs, GitHub) | ✅ | 2026-05-30 | Done. |
-| F2 | CNE data pipeline (`cneIngest` → Storage) | 🟨 | 2026-05-31 | Deployed + scheduled. **Verify** `stations/latest.json.gz` exists in Firebase Storage. |
-| F3 | Full-screen map + draggable bottom sheet | 🟨 | 2026-05-31 | Code done, builds. 🔵 Needs real Maps API key in `secrets.properties` to show map. |
-| F4 | Station data (`CloudStationRepository`) | 🟨 | 2026-05-31 | Code done. 🔵 Needs F2 verified + F7 auth to read Storage blob. |
-| F5 | Price color tiers (green→red markers) | 🟨 | 2026-05-31 | Code done (ported `MarkerPriceTier` + bitmap factory). Needs F3 + F4 to verify visually. |
-| F6 | Location + Haversine ranking, filters | 🟨 | 2026-05-31 | Code done. Needs device test with location permission. |
-| F7 | Google Sign-In + App Check | 🟨 | 2026-05-31 | Code done. 🔵 Needs: Google sign-in enabled in console, SHA-1 registered, `google-services.json` re-downloaded, App Check debug token registered. |
+| F2 | CNE data pipeline (`cneIngest` → Storage) | ✅ | 2026-05-31 | Running every 30 min, 13,727 stations. Confirmed in logs + live on device. |
+| F3 | Full-screen map + draggable bottom sheet | ✅ | 2026-05-31 | Working on emulator + Samsung S23 FE. |
+| F4 | Station data (`CloudStationRepository`) | ✅ | 2026-05-31 | Blob downloads, gunzips, Haversine ranking confirmed working. |
+| F5 | Price color tiers (green→red markers) | ✅ | 2026-05-31 | Confirmed visually — green/yellow/orange/red markers showing on map. |
+| F6 | Location + Haversine ranking, filters | ✅ | 2026-05-31 | Location, fuel type + Top N filters working on both devices. |
+| F7 | Google Sign-In + App Check | ✅ | 2026-05-31 | Working on emulator + real device. Two debug tokens registered. |
 | F8 | Places search + Directions ETA gateway | 🟨 | 2026-05-31 | Android done. 🔵 Backend needs `MAPS_SERVER_KEY` secret + uncomment + redeploy (Step 6 above). |
-| F9 | Navigation deep-link (Google Maps) | 🟨 | 2026-05-31 | Code done. Needs device test. |
-| F10 | Polish, error states, offline fallback | ✅ | 2026-05-31 | Done (loading/error states, in-memory cache, test fixes). |
-| F11 | Signed release APK/AAB | ⬜ | — | See Step 7 above. |
+| F9 | Navigation deep-link (Google Maps) | 🟨 | 2026-05-31 | Code done. Test by tapping "Navegar" on a station — should open Google Maps navigation. |
+| F10 | Polish, error states, offline fallback | ✅ | 2026-05-31 | Done. |
+| F11 | Signed release APK/AAB | ⬜ | — | Last remaining step — see Step 7 in Next Steps above. |
 
 ---
 
@@ -139,9 +139,9 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 - [x] Firebase Storage bucket created _(2026-05-31)_
 - [x] `google-services.json` downloaded to `android/app/` _(2026-05-31)_
 - [ ] **Google Maps Android API key** created + added to `secrets.properties` _(Step 2)_
-- [ ] **Google Sign-In enabled** in Firebase Auth console _(Step 3)_
-- [ ] **Debug SHA-1** registered in Firebase project settings _(Step 3)_
-- [ ] **`google-services.json` re-downloaded** after SHA-1 added _(Step 3)_
+- [x] **Google Sign-In enabled** in Firebase Auth console _(2026-05-31)_
+- [x] **Debug SHA-1** registered in Firebase project settings _(2026-05-31)_
+- [x] **`google-services.json` re-downloaded** after SHA-1 added _(2026-05-31)_
 - [ ] **App Check debug token** registered in console _(Step 4)_
 - [ ] **Maps server key** set as `MAPS_SERVER_KEY` secret + functions redeployed _(Step 6)_
 - [ ] **Release keystore** generated + release APK/AAB built _(Step 7)_
