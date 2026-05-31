@@ -6,8 +6,9 @@
 ---
 
 ## ⏱️ Current focus
-**F1–F10 all complete.** App fully working on emulator + Samsung S23 FE. Only remaining: **F11 —
-signed release APK/AAB** (generate keystore, wire signingConfig, build release).
+**Phase 1 complete.** All F1–F11 done. Signed release APK + AAB verified on Samsung S23 FE.
+Map loads with real CNE prices, Google Sign-In works, colored markers, search, navigation all
+functional. Play Integrity App Check will activate once published to Play Store.
 
 ## ▶️ Next step (ordered — do these in sequence)
 
@@ -114,7 +115,7 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 | F8 | Places search + Directions ETA gateway | ✅ | 2026-05-31 | Working on S23 FE — search bar + "Ver ruta exacta" confirmed. |
 | F9 | Navigation deep-link (Google Maps) | ✅ | 2026-05-31 | Confirmed working on S23 FE. |
 | F10 | Polish, error states, offline fallback | ✅ | 2026-05-31 | Done. |
-| F11 | Signed release APK/AAB | ⬜ | — | Last remaining step — see Step 7 in Next Steps above. |
+| F11 | Signed release APK/AAB | ✅ | 2026-05-31 | Release APK (3.7 MB) + AAB (6.4 MB) built, signed (v2), verified on Samsung S23 FE. |
 
 ---
 
