@@ -70,14 +70,14 @@ class GasViewModelTest {
 
         assertFalse(state.isLoading)
         assertTrue(state.stations.isEmpty())
-        assertEquals("No se pudo conectar con el servicio. Intenta de nuevo.", state.errorMessage)
+        assertEquals("No se pudo conectar. Intenta de nuevo.", state.errorMessage)
     }
 
     @Test
     fun `dataset unavailable failure exposes data not ready state`() = runTest {
         val viewModel = GasViewModel(
             FailingStationRepository(
-                error = StationDatasetUnavailableException(responseBody = null),
+                error = StationDatasetUnavailableException("not ready"),
             ),
         )
 
@@ -87,7 +87,10 @@ class GasViewModelTest {
 
         assertFalse(state.isLoading)
         assertTrue(state.stations.isEmpty())
-        assertEquals("El servicio esta activo, pero aun no tiene datos de precios disponibles.", state.errorMessage)
+        assertEquals(
+            "El servicio aún no tiene datos de precios disponibles. Intenta en unos minutos.",
+            state.errorMessage,
+        )
     }
 
     @Test
@@ -104,48 +107,32 @@ class GasViewModelTest {
     }
 
     @Test
-    fun `selecting station refreshes detail from repository`() = runTest {
-        val repository = FakeStationRepository(
-            stationDetail = GasStation(
-                stationId = "regular-5",
-                name = "Station detail",
-                address = "Updated address",
-                latitude = 20.67,
-                longitude = -103.35,
-                distanceMeters = 80,
-                prices = mapOf(FuelType.Regular to 22.0, FuelType.Premium to 24.0),
-                lastUpdatedAt = "2026-05-12T18:00:00Z",
-            ),
-        )
+    fun `selecting station sets selectedStation immediately`() = runTest {
+        val repository = FakeStationRepository()
         val viewModel = GasViewModel(repository)
 
         viewModel.onLocationAvailable(UserLocation(latitude = 20.67, longitude = -103.35))
-        viewModel.onStationSelected(viewModel.uiState.value.stations.first())
+        val station = viewModel.uiState.value.stations.first()
+        viewModel.onStationSelected(station)
 
         val state = viewModel.uiState.value
-
+        assertEquals(station, state.selectedStation)
         assertFalse(state.isStationDetailLoading)
         assertNull(state.stationDetailErrorMessage)
-        assertEquals("Station detail", state.selectedStation?.name)
-        assertEquals(24.0, state.selectedStation?.prices?.get(FuelType.Premium))
     }
 
     @Test
-    fun `detail failure keeps selected list station and exposes detail message`() = runTest {
-        val repository = FakeStationRepository(
-            stationDetailError = IllegalStateException("detail unavailable"),
-        )
-        val viewModel = GasViewModel(repository)
+    fun `dismissing station detail clears selection and directions`() = runTest {
+        val viewModel = GasViewModel(FakeStationRepository())
 
         viewModel.onLocationAvailable(UserLocation(latitude = 20.67, longitude = -103.35))
-        val selectedFromList = viewModel.uiState.value.stations.first()
-        viewModel.onStationSelected(selectedFromList)
+        viewModel.onStationSelected(viewModel.uiState.value.stations.first())
+        viewModel.onStationDetailDismissed()
 
         val state = viewModel.uiState.value
-
-        assertFalse(state.isStationDetailLoading)
-        assertEquals(selectedFromList, state.selectedStation)
-        assertEquals("No se pudo conectar con el servicio. Intenta de nuevo.", state.stationDetailErrorMessage)
+        assertNull(state.selectedStation)
+        assertNull(state.directions)
+        assertFalse(state.isDirectionsLoading)
     }
 }
 
@@ -154,10 +141,7 @@ private data class RepositoryRequest(
     val resultLimit: ResultLimit,
 )
 
-private class FakeStationRepository(
-    private val stationDetail: GasStation? = null,
-    private val stationDetailError: Throwable? = null,
-) : StationRepository {
+private class FakeStationRepository : StationRepository {
     val requests = mutableListOf<RepositoryRequest>()
 
     override suspend fun getNearbyStations(
@@ -181,10 +165,7 @@ private class FakeStationRepository(
         )
     }
 
-    override suspend fun getStation(stationId: String): GasStation? {
-        stationDetailError?.let { throw it }
-        return stationDetail
-    }
+    override suspend fun getStation(stationId: String): GasStation? = null
 }
 
 private class FailingStationRepository(
@@ -195,11 +176,7 @@ private class FailingStationRepository(
         longitude: Double,
         fuelType: FuelType,
         resultLimit: ResultLimit,
-    ): List<GasStation> {
-        throw error
-    }
+    ): List<GasStation> = throw error
 
-    override suspend fun getStation(stationId: String): GasStation? {
-        throw error
-    }
+    override suspend fun getStation(stationId: String): GasStation? = throw error
 }
