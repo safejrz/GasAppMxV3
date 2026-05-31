@@ -12,5 +12,5 @@ export { cneIngest } from "./cneIngest";
 //   firebase functions:secrets:set MAPS_SERVER_KEY
 // They are commented out so `cneIngest` (F2) can deploy before the Maps key exists, since
 // the CLI evaluates defineSecret() across the whole codebase during source analysis.
-// export { placesSearch } from "./places";
-// export { directions } from "./directions";
+export { placesSearch } from "./places";
+export { directions } from "./directions";
