@@ -72,7 +72,9 @@ class FunctionsClient(
     private suspend fun callFunction(name: String, data: Map<String, Any>): Map<String, Any> {
         return try {
             @Suppress("UNCHECKED_CAST")
-            functions.getHttpsCallable(name).call(data).await().data as Map<String, Any>
+            val result = functions.getHttpsCallable(name).call(data).await()
+            @Suppress("UNCHECKED_CAST")
+            result.getData() as Map<String, Any>
         } catch (e: FirebaseFunctionsException) {
             if (e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED) {
                 throw QuotaExhaustedException(e.message ?: "Límite diario alcanzado.")
