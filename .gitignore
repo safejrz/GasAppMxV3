@@ -1,0 +1,33 @@
+# === Secrets — never commit ===
+secrets.properties
+**/google-services.json
+*.keystore
+*.jks
+*.p12
+service-account*.json
+.env
+.env.*
+!.env.example
+
+# === Android / Gradle ===
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/*.iml
+.cxx/
+
+# === Firebase / Node ===
+firebase/functions/node_modules/
+firebase/functions/lib/
+firebase/.firebase/
+firebase/firebase-debug.log
+firebase/firestore-debug.log
+firebase/ui-debug.log
+firebase/**/*.local
+
+# === Misc ===
+.DS_Store
+*.log

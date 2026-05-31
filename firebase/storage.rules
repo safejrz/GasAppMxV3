@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Cached, normalized CNE station dataset (stations/latest.json, gzipped).
+    // Readable by any signed-in user; only Cloud Functions write it.
+    match /stations/{file} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

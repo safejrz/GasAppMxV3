@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Data freshness metadata — readable by any signed-in user, never client-writable.
+    match /meta/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false; // written by Cloud Functions (Admin SDK bypasses rules)
+    }
+
+    // Per-user usage counters — fully server-managed; clients can never read or write them.
+    match /usage/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

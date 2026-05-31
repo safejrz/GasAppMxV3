@@ -1,0 +1,25 @@
+{
+  "name": "gasappmxv3-functions",
+  "version": "0.1.0",
+  "description": "GasAppMxV3 serverless backend: CNE ingest + gated Places/Directions proxies.",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,storage,auth",
+    "deploy": "firebase deploy --only functions,firestore:rules,storage:rules",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.4.1",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "private": true
+}
