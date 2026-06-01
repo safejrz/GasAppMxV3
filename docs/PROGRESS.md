@@ -6,9 +6,14 @@
 ---
 
 ## ⏱️ Current focus
-**Phase 1 complete.** All F1–F11 done. Signed release APK + AAB verified on Samsung S23 FE.
-Map loads with real CNE prices, Google Sign-In works, colored markers, search, navigation all
-functional. Play Integrity App Check will activate once published to Play Store.
+**Phase 1 complete + on internal testing.** All F1–F11 done. App is on Play Store Internal Testing
+and **testers can sign in** (multiple devices confirmed 2026-05-31). Remaining to reach Production:
+finish the Play Console store-listing checklist (countries, testers list) and apply for Production
+access.
+
+> **Fix that unblocked tester sign-in (2026-05-31):** Google Play re-signs the AAB with its own key.
+> Registered Google's signing SHA-1 `33:AD:F6:...:C0:BD` in Firebase → sign-in worked for all testers,
+> no rebuild needed. See BUILD_GUIDE §6b.
 
 ## ▶️ Next step (ordered — do these in sequence)
 

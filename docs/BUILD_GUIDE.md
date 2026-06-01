@@ -157,6 +157,35 @@ Register the release keystore's **SHA-1** in Firebase (Google Sign-In) and on th
 
 ---
 
+## 6b. Google Play App Signing & Sign-In (CRITICAL)
+
+When you upload an AAB to the Play Store, **Google re-signs the app with its own signing key** — not
+your release keystore. Testers and users run the *Play-signed* build, so **its SHA-1 must be registered
+in Firebase**, or Google Sign-In fails with:
+
+```
+W/Auth.Api.Credentials: chpa: [28444]
+"Developer console is not set up correctly" / DEVELOPER_ERROR (status 10)
+```
+
+Register Google Play's signing-key SHA-1 + SHA-256 in
+`Firebase console → Project settings → Your apps → mx.gasappmx → Add fingerprint`. **No rebuild or
+reinstall is needed** — Google Sign-In validation is server-side, so already-installed apps start
+working ~5 min after the fingerprint is added.
+
+**Where to find Google's signing SHA-1:**
+- Play Console → *App integrity* → *App signing key certificate* (only visible once the store listing
+  is complete enough to unlock it), **or**
+- Extract it from any device that has the Play build installed (no Play Console access needed):
+  ```bash
+  BASE_APK=$(adb shell pm path mx.gasappmx | tr -d '\r' | sed 's/package://' | grep base.apk)
+  adb pull "$BASE_APK" /tmp/play.apk
+  apksigner verify --print-certs /tmp/play.apk    # "Signer #1" = Google's signing key
+  ```
+
+There are therefore **three** keystores whose SHAs may need registering in Firebase: debug, your local
+release (`release.jks`), and **Google Play's signing key**.
+
 ## 7. Gotchas / checklist
 
 - **App Check in debug:** register the debug token (Logcat) or sign-in + functions return 403 in dev.
