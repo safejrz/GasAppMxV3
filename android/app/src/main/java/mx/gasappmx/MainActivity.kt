@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -26,8 +27,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.Granularity
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -36,6 +40,7 @@ import kotlinx.coroutines.launch
 import mx.gasappmx.auth.AuthManager
 import mx.gasappmx.data.CloudStationRepository
 import mx.gasappmx.model.GasStation
+import mx.gasappmx.model.FuelType
 import mx.gasappmx.ui.GasApp
 import mx.gasappmx.ui.GasViewModel
 import mx.gasappmx.ui.SignInScreen
@@ -105,6 +110,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val requestLocation = {
+            viewModel.onFollowDeviceLocationRequested()
             if (hasLocationPermission()) {
                 loadCurrentLocation(viewModel)
             } else {
@@ -114,6 +120,15 @@ class MainActivity : ComponentActivity() {
                         Manifest.permission.ACCESS_COARSE_LOCATION,
                     ),
                 )
+            }
+        }
+
+        DisposableEffect(hasLocationPermission()) {
+            if (!hasLocationPermission()) {
+                onDispose { }
+            } else {
+                val stopUpdates = startContinuousLocationUpdates(viewModel)
+                onDispose { stopUpdates() }
             }
         }
 
@@ -127,14 +142,31 @@ class MainActivity : ComponentActivity() {
             onStationDetailDismissed = viewModel::onStationDetailDismissed,
             onNavigateToStation = ::openGoogleMapsNavigation,
             onRequestLocation = requestLocation,
-            onSearchQueryChange = viewModel::onSearchQueryChange,
-            onSearchSubmit = viewModel::onSearchSubmit,
-            onSearchResultSelected = viewModel::onSearchResultSelected,
-            onSearchDismissed = viewModel::onSearchDismissed,
+            onViewportRefreshRequested = viewModel::onViewportRefreshRequested,
             onDirectionsRequested = viewModel::onDirectionsRequested,
+            onReportInconsistency = ::openProfecoReport,
             userLabel = userLabel,
             onSignOut = { scope.launch { authManager.signOut() } },
         )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startContinuousLocationUpdates(viewModel: GasViewModel): () -> Unit {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000L)
+            .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+            .setMinUpdateIntervalMillis(5_000L)
+            .setMinUpdateDistanceMeters(80f)
+            .build()
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                locationResult.lastLocation?.let { viewModel.onLocationAvailable(it.toUserLocation()) }
+            }
+        }
+
+        fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        loadCurrentLocation(viewModel)
+        return { fusedLocationClient.removeLocationUpdates(callback) }
     }
 
     private fun openGoogleMapsNavigation(station: GasStation) {
@@ -143,6 +175,36 @@ class MainActivity : ComponentActivity() {
             setPackage("com.google.android.apps.maps")
         }
         startActivity(intent)
+    }
+
+    private fun openProfecoReport(station: GasStation) {
+        val subject = "Reporte de inconsistencia de precio - ${station.name}"
+        val priceLines = FuelType.entries.joinToString(separator = "\n") { fuelType ->
+            val price = station.prices[fuelType]?.let { "$%.2f MXN".format(it) } ?: "No disponible"
+            "- ${fuelType.label}: $price"
+        }
+        val body = buildString {
+            appendLine("Hola PROFECO,")
+            appendLine()
+            appendLine("Quiero reportar una posible inconsistencia de precio detectada en la app.")
+            appendLine()
+            appendLine("Estación: ${station.name}")
+            appendLine("Dirección / CRE: ${station.address}")
+            appendLine("Coordenadas: ${station.latitude}, ${station.longitude}")
+            appendLine("Precio en la app:")
+            appendLine(priceLines)
+            appendLine()
+            appendLine("Precio observado en sitio: __________________")
+            appendLine("Fecha y hora: __________________")
+            appendLine("Notas adicionales: __________________")
+        }
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
+        startActivity(Intent.createChooser(intent, "Reportar a PROFECO"))
     }
 
     private fun hasLocationPermission(): Boolean {

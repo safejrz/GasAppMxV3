@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mx.gasappmx.data.DirectionsResult
 import mx.gasappmx.data.FunctionsClient
-import mx.gasappmx.data.PlaceResult
 import mx.gasappmx.data.QuotaExhaustedException
 import mx.gasappmx.data.StationDatasetUnavailableException
 import mx.gasappmx.data.StationRepository
@@ -35,15 +34,11 @@ data class GasUiState(
     val isDirectionsLoading: Boolean = false,
     val directionsError: String? = null,
     val userLocation: UserLocation? = null,
+    val stationAnchor: UserLocation? = null,
+    val followDeviceLocation: Boolean = true,
     val locationPermissionDenied: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    // Places search (F8).
-    val searchQuery: String = "",
-    val searchResults: List<PlaceResult> = emptyList(),
-    val isSearching: Boolean = false,
-    val searchError: String? = null,
-    val searchCenter: UserLocation? = null, // map recenters here after a place is picked
 )
 
 class GasViewModel(
@@ -71,7 +66,35 @@ class GasViewModel(
 
     fun onLocationAvailable(userLocation: UserLocation) {
         _uiState.update {
-            it.copy(userLocation = userLocation, locationPermissionDenied = false, errorMessage = null)
+            val shouldTrackLocation = it.followDeviceLocation || it.stationAnchor == null
+            it.copy(
+                userLocation = userLocation,
+                stationAnchor = if (shouldTrackLocation) userLocation else it.stationAnchor,
+                locationPermissionDenied = false,
+                errorMessage = null,
+            )
+        }
+        refreshStations()
+    }
+
+    fun onFollowDeviceLocationRequested() {
+        _uiState.update {
+            it.copy(
+                followDeviceLocation = true,
+                stationAnchor = it.userLocation ?: it.stationAnchor,
+                selectedStation = null,
+            )
+        }
+        refreshStations()
+    }
+
+    fun onViewportRefreshRequested(center: UserLocation) {
+        _uiState.update {
+            it.copy(
+                followDeviceLocation = false,
+                stationAnchor = center,
+                selectedStation = null,
+            )
         }
         refreshStations()
     }
@@ -84,6 +107,7 @@ class GasViewModel(
                 isStationDetailLoading = false,
                 stationDetailErrorMessage = null,
                 userLocation = null,
+                stationAnchor = null,
                 locationPermissionDenied = true,
                 isLoading = false,
                 errorMessage = null,
@@ -98,6 +122,7 @@ class GasViewModel(
                 selectedStation = null,
                 isStationDetailLoading = false,
                 stationDetailErrorMessage = null,
+                stationAnchor = null,
                 isLoading = false,
                 errorMessage = "No pudimos obtener tu ubicación. Revisa que la ubicación del dispositivo esté activa.",
             )
@@ -162,62 +187,13 @@ class GasViewModel(
         }
     }
 
-    // ── Places search (F8) ────────────────────────────────────────────────────
-
-    fun onSearchQueryChange(query: String) {
-        _uiState.update { it.copy(searchQuery = query, searchResults = emptyList(), searchError = null) }
-    }
-
-    /** Submits the search query to the gated Places callable. Consumes one Places quota token. */
-    fun onSearchSubmit() {
-        val query = _uiState.value.searchQuery.trim()
-        if (query.isBlank()) return
-        val userLoc = _uiState.value.userLocation
-
-        _uiState.update { it.copy(isSearching = true, searchResults = emptyList(), searchError = null) }
-
-        viewModelScope.launch {
-            runCatching {
-                functionsClient.searchPlaces(
-                    query = query,
-                    lat = userLoc?.latitude,
-                    lon = userLoc?.longitude,
-                )
-            }.onSuccess { results ->
-                _uiState.update { it.copy(searchResults = results, isSearching = false) }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(isSearching = false, searchError = error.toUserMessage())
-                }
-            }
-        }
-    }
-
-    fun onSearchResultSelected(place: PlaceResult) {
-        val newCenter = UserLocation(place.lat, place.lon)
-        _uiState.update {
-            it.copy(
-                searchQuery = place.name,
-                searchResults = emptyList(),
-                searchCenter = newCenter,
-                userLocation = newCenter,
-                selectedStation = null,
-            )
-        }
-        refreshStations()
-    }
-
-    fun onSearchDismissed() {
-        _uiState.update { it.copy(searchQuery = "", searchResults = emptyList(), searchError = null) }
-    }
-
     // ── Stations refresh ──────────────────────────────────────────────────────
 
     fun refreshStations() {
         viewModelScope.launch {
             val current = _uiState.value
-            val userLocation = current.userLocation
-            if (userLocation == null) {
+            val anchor = current.stationAnchor ?: current.userLocation
+            if (anchor == null) {
                 _uiState.update { it.copy(isLoading = false, stations = emptyList()) }
                 return@launch
             }
@@ -226,8 +202,8 @@ class GasViewModel(
 
             runCatching {
                 repository.getNearbyStations(
-                    latitude = userLocation.latitude,
-                    longitude = userLocation.longitude,
+                    latitude = anchor.latitude,
+                    longitude = anchor.longitude,
                     fuelType = current.fuelType,
                     resultLimit = current.resultLimit,
                 )

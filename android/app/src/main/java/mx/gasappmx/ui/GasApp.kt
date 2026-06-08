@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
@@ -23,24 +21,26 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -51,10 +51,12 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import mx.gasappmx.data.DirectionsResult
-import mx.gasappmx.data.PlaceResult
 import mx.gasappmx.model.FuelType
 import mx.gasappmx.model.GasStation
 import mx.gasappmx.model.ResultLimit
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
 
 private val DEFAULT_CENTER = LatLng(20.6597, -103.3496)
 
@@ -68,11 +70,9 @@ fun GasApp(
     onStationDetailDismissed: () -> Unit,
     onNavigateToStation: (GasStation) -> Unit,
     onRequestLocation: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchSubmit: () -> Unit,
-    onSearchResultSelected: (PlaceResult) -> Unit,
-    onSearchDismissed: () -> Unit,
+    onViewportRefreshRequested: (UserLocation) -> Unit,
     onDirectionsRequested: () -> Unit,
+    onReportInconsistency: (GasStation) -> Unit,
     userLabel: String?,
     onSignOut: () -> Unit,
 ) {
@@ -100,38 +100,45 @@ fun GasApp(
                 onNavigateToStation = onNavigateToStation,
                 onRequestLocation = onRequestLocation,
                 onDirectionsRequested = onDirectionsRequested,
+                onReportInconsistency = onReportInconsistency,
             )
         },
     ) { _ ->
+        var mapCenter by remember { mutableStateOf(DEFAULT_CENTER) }
         Box(modifier = Modifier.fillMaxSize()) {
-            NearbyMap(state = state, onStationSelected = onStationSelected)
-            TopOverlay(
+            NearbyMap(
                 state = state,
+                onStationSelected = onStationSelected,
+                onMapCenterChanged = { mapCenter = it },
+            )
+            TopOverlay(
                 userLabel = userLabel,
                 onSignOut = onSignOut,
-                onSearchQueryChange = onSearchQueryChange,
-                onSearchSubmit = onSearchSubmit,
-                onSearchResultSelected = onSearchResultSelected,
-                onSearchDismissed = onSearchDismissed,
             )
+            FloatingActionButton(
+                onClick = {
+                    onViewportRefreshRequested(UserLocation(mapCenter.latitude, mapCenter.longitude))
+                },
+                containerColor = Color(0xFF2471A3),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 86.dp, end = 12.dp),
+            ) {
+                Text("↻", style = MaterialTheme.typography.headlineMedium)
+            }
         }
     }
 }
 
-// ── Top overlay: title + search bar ──────────────────────────────────────────
+// ── Top overlay: title row ───────────────────────────────────────────────────
 
 @Composable
 private fun TopOverlay(
-    state: GasUiState,
     userLabel: String?,
     onSignOut: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchSubmit: () -> Unit,
-    onSearchResultSelected: (PlaceResult) -> Unit,
-    onSearchDismissed: () -> Unit,
 ) {
-    val keyboard = LocalSoftwareKeyboardController.current
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -165,79 +172,6 @@ private fun TopOverlay(
                 TextButton(onClick = onSignOut) { Text("Salir") }
             }
         }
-
-        // Search bar
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 3.dp,
-            shadowElevation = 3.dp,
-        ) {
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = onSearchQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                placeholder = { Text("Buscar zona o dirección...") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    keyboard?.hide()
-                    onSearchSubmit()
-                }),
-                trailingIcon = {
-                    if (state.searchQuery.isNotEmpty()) {
-                        TextButton(onClick = {
-                            keyboard?.hide()
-                            onSearchDismissed()
-                        }) { Text("✕") }
-                    }
-                },
-            )
-        }
-
-        // Search results dropdown
-        if (state.isSearching) {
-            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator()
-                    Text("Buscando...", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        } else if (state.searchResults.isNotEmpty()) {
-            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp, shadowElevation = 4.dp) {
-                LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
-                    items(state.searchResults) { place ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSearchResultSelected(place) }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
-                            Text(text = place.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            if (place.address.isNotBlank()) {
-                                Text(text = place.address, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                        HorizontalDivider()
-                    }
-                }
-            }
-        } else if (state.searchError != null) {
-            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp) {
-                Text(
-                    text = state.searchError,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
     }
 }
 
@@ -247,25 +181,18 @@ private fun TopOverlay(
 private fun NearbyMap(
     state: GasUiState,
     onStationSelected: (GasStation) -> Unit,
+    onMapCenterChanged: (LatLng) -> Unit,
 ) {
-    val userLocation = state.userLocation
-    val center = userLocation?.let { LatLng(it.latitude, it.longitude) } ?: DEFAULT_CENTER
+    val anchor = state.stationAnchor ?: state.userLocation
+    val center = anchor?.let { LatLng(it.latitude, it.longitude) } ?: DEFAULT_CENTER
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(center, 13.5f)
     }
 
-    LaunchedEffect(state.searchCenter) {
-        state.searchCenter?.let {
+    LaunchedEffect(state.stationAnchor) {
+        state.stationAnchor?.let {
             cameraPositionState.animate(
                 CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 13.5f),
-            )
-        }
-    }
-
-    LaunchedEffect(userLocation) {
-        if (userLocation != null && state.searchCenter == null) {
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(LatLng(userLocation.latitude, userLocation.longitude), 13.5f),
             )
         }
     }
@@ -276,6 +203,12 @@ private fun NearbyMap(
         }
     }
 
+    LaunchedEffect(cameraPositionState) {
+        snapshotFlow { cameraPositionState.position.target }
+            .distinctUntilChanged()
+            .collectLatest { onMapCenterChanged(it) }
+    }
+
     val context = LocalContext.current
     val tierMap = remember(state.stations, state.fuelType) {
         stationPriceTiers(state.stations, state.fuelType)
@@ -284,7 +217,7 @@ private fun NearbyMap(
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState,
-        properties = MapProperties(isMyLocationEnabled = userLocation != null),
+        properties = MapProperties(isMyLocationEnabled = state.userLocation != null),
         uiSettings = MapUiSettings(myLocationButtonEnabled = false, zoomControlsEnabled = false),
     ) {
         state.stations.forEach { station ->
@@ -318,6 +251,7 @@ private fun SheetContent(
     onNavigateToStation: (GasStation) -> Unit,
     onRequestLocation: () -> Unit,
     onDirectionsRequested: () -> Unit,
+    onReportInconsistency: (GasStation) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -344,6 +278,7 @@ private fun SheetContent(
                 onDismiss = onStationDetailDismissed,
                 onNavigate = { onNavigateToStation(state.selectedStation) },
                 onRequestDirections = onDirectionsRequested,
+                onReportInconsistency = onReportInconsistency,
             )
             state.stations.isEmpty() -> StatusMessage(
                 "No hay estaciones cercanas con precio ${state.fuelType.label}.",
@@ -442,6 +377,7 @@ private fun StationDetail(
     onDismiss: () -> Unit,
     onNavigate: () -> Unit,
     onRequestDirections: () -> Unit,
+    onReportInconsistency: (GasStation) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -482,6 +418,7 @@ private fun StationDetail(
                 if (directions == null && !isDirectionsLoading) {
                     AssistChip(onClick = onRequestDirections, label = { Text("Ver ruta exacta") })
                 }
+                AssistChip(onClick = { onReportInconsistency(station) }, label = { Text("PROFECO") })
                 Button(onClick = onNavigate) { Text("Navegar") }
             }
         }
