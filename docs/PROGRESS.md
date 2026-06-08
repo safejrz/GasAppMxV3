@@ -6,80 +6,28 @@
 ---
 
 ## ⏱️ Current focus
-**Phase 1 complete + on internal testing.** All F1–F11 done. App is on Play Store Internal Testing
-and **testers can sign in** (multiple devices confirmed 2026-05-31). Remaining to reach Production:
-finish the Play Console store-listing checklist (countries, testers list) and apply for Production
-access.
+**Phase 1 plan verified complete (2026-06-07).** All F1–F11 are done and validated in this tracker.
+App is on Play Store Internal Testing and **testers can sign in** (multiple devices confirmed
+2026-05-31). Remaining work is **post-plan release work**: finish Play Console store listing,
+testing-country setup, and submit for Production access.
 
 > **Fix that unblocked tester sign-in (2026-05-31):** Google Play re-signs the AAB with its own key.
 > Registered Google's signing SHA-1 `33:AD:F6:...:C0:BD` in Firebase → sign-in worked for all testers,
 > no rebuild needed. See BUILD_GUIDE §6b.
 
-## ▶️ Next step (ordered — do these in sequence)
+## ▶️ Next step (post-plan release sequence)
 
-### 1. Verify the CNE data pipeline is running (F2)
-- Open **Firebase console → Storage** for project `gasappmxv3`.
-- Confirm `stations/latest.json.gz` exists. If not, check Cloud Logging →
-  Cloud Run → `cneingest` service for errors.
+### 1. Complete Play Console store listing
+- Finalize text/assets checklist in `docs/STORE_LISTING.md`.
+- Confirm privacy policy URL is published and matches app behavior.
 
-### 2. Get a Google Maps API key (F3/F4 unblock)
-- Google Cloud Console → APIs & Services → Credentials → **Create credential → API key**.
-- Restrict it: Application restrictions → **Android apps** → add package `mx.gasappmx` +
-  SHA-1 `FA:15:46:2E:C4:FF:15:32:83:2E:B8:6E:67:67:5B:99:9C:D3:C9:82`.
-- Enable only **Maps SDK for Android**.
-- Add the key to `android/secrets.properties` (gitignored):
-  ```
-  GOOGLE_MAPS_API_KEY=AIza...your-android-key-here
-  ```
-- Rebuild: `cd android && ./gradlew assembleDebug`
+### 2. Finalize Internal Testing rollout settings
+- Confirm tester groups, country availability, and release notes are set.
+- Keep one active internal track build while collecting sign-in and map stability feedback.
 
-### 3. Wire Google Sign-In (F7 unblock)
-Already done in code — just needs these console steps:
-- **Firebase console → Authentication → Sign-in method → Google → Enable** (set support email → Save).
-- **Firebase console → Project settings → Your apps → `mx.gasappmx` → Add fingerprint**:
-  - Debug SHA-1: `FA:15:46:2E:C4:FF:15:32:83:2E:B8:6E:67:67:5B:99:9C:D3:C9:82`
-- **Re-download `google-services.json`** after adding the fingerprint (it gets baked in) →
-  replace `android/app/google-services.json` → rebuild.
-
-### 4. Register App Check debug token (F7 unblock)
-- Install the debug APK on a device/emulator and open Logcat.
-- Search for `DebugAppCheckToken` — copy the token printed there.
-- **Firebase console → App Check → Apps → `mx.gasappmx` → Manage debug tokens → Add**.
-- Without this, Storage reads and function calls will be rejected in dev.
-
-### 5. Install and smoke-test on a device
-```bash
-# USB-connected Android device with USB Debugging enabled:
-~/Android/Sdk/platform-tools/adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-```
-Expected: sign-in screen → Google auth → map loads with colored price markers → tap station → Navegar opens Google Maps navigation.
-
-### 6. Enable the paid API gateway (F8 backend — do after smoke test)
-- Create a **server-side Maps API key** (no app restriction; restrict to Places API +
-  Directions API only) in Google Cloud Console.
-- Set the secret: `firebase functions:secrets:set MAPS_SERVER_KEY` (paste key when prompted).
-- Uncomment lines in `firebase/functions/src/index.ts`:
-  ```typescript
-  export { placesSearch } from "./places";
-  export { directions } from "./directions";
-  ```
-- Redeploy: `cd firebase && firebase deploy --only functions --project gasappmxv3 --force`
-- Test: search for a place in the app → map recenters; tap "Ver ruta exacta" in station detail.
-
-### 7. Build the signed release APK (F11 — final step)
-```bash
-# Generate a release keystore (do this once, keep the file safe — not in git):
-keytool -genkey -v -keystore android/release.jks -keyalg RSA -keysize 2048 \
-  -validity 10000 -alias gasappmx
-
-# Add to android/secrets.properties:
-# RELEASE_KEYSTORE_PATH=release.jks
-# RELEASE_KEY_ALIAS=gasappmx
-# RELEASE_STORE_PASSWORD=yourpassword
-# RELEASE_KEY_PASSWORD=yourpassword
-```
-Then ask Claude to wire the signingConfig into `android/app/build.gradle.kts` and build the AAB.
-- Register the **release SHA-1** in Firebase (same place as debug SHA-1) before publishing.
+### 3. Request Production access
+- Submit the required Play Console declarations and production access request.
+- After approval, promote the validated internal build to Production.
 
 ---
 
@@ -134,6 +82,8 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
   deprecated `GoogleSignInClient`.
 - **2026-05-31** — First build succeeded. Fixed `FunctionsClient.getData()` — `HttpsCallableResult`
   in firebase-functions-ktx BOM 33 exposes `getData()` returning `Any?`, not a typed generic.
+- **2026-06-07** — Plan verification pass completed: all Phase 1 items in `PLAN.md` map to completed
+  checklist entries F1–F11 in this file. Tracker focus switched to post-plan Play Console release work.
 
 ## Manual steps completed
 - [x] `firebase login` as ingjrz@gmail.com _(2026-05-30)_
@@ -142,10 +92,10 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
 - [x] Firestore database created _(2026-05-31)_
 - [x] Firebase Storage bucket created _(2026-05-31)_
 - [x] `google-services.json` downloaded to `android/app/` _(2026-05-31)_
-- [ ] **Google Maps Android API key** created + added to `secrets.properties` _(Step 2)_
+- [x] **Google Maps Android API key** created + added to `secrets.properties` _(required for F3/F4 done)_
 - [x] **Google Sign-In enabled** in Firebase Auth console _(2026-05-31)_
 - [x] **Debug SHA-1** registered in Firebase project settings _(2026-05-31)_
 - [x] **`google-services.json` re-downloaded** after SHA-1 added _(2026-05-31)_
-- [ ] **App Check debug token** registered in console _(Step 4)_
-- [ ] **Maps server key** set as `MAPS_SERVER_KEY` secret + functions redeployed _(Step 6)_
-- [ ] **Release keystore** generated + release APK/AAB built _(Step 7)_
+- [x] **App Check debug token** registered in console _(required for F7 verification)_
+- [x] **Maps server key** set as `MAPS_SERVER_KEY` secret + functions redeployed _(required for F8 done)_
+- [x] **Release keystore** generated + release APK/AAB built _(required for F11 done)_
