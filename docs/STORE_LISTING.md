@@ -27,7 +27,9 @@ Características principales:
 ✓ Mapa en tiempo real con precios color-codificados
 ✓ Filtra por tipo de combustible: Regular, Premium o Diesel
 ✓ Muestra Top 5, 10, 25 o 50 estaciones más cercanas
-✓ Busca por zona o dirección para explorar precios en cualquier parte de México
+✓ Mueve el mapa para explorar precios en cualquier parte de México
+✓ Tu posición se actualiza en tiempo real mientras te desplazas
+✓ Reporta precios inconsistentes a PROFECO con un toque
 ✓ Ruta exacta con tiempo y distancia en auto
 ✓ Apertura directa en Google Maps para navegación
 ✓ Datos oficiales del gobierno mexicano (CNE/CRE)

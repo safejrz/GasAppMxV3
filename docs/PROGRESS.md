@@ -7,15 +7,22 @@
 
 ## ⏱️ Current focus
 **Phase 1 plan verified complete (2026-06-07).** All F1–F11 are done and validated in this tracker.
-App is on Play Store Internal Testing and **testers can sign in** (multiple devices confirmed
-2026-05-31). Remaining work is **post-plan release work**: finish Play Console store listing,
-testing-country setup, and submit for Production access.
+**V-next features (`docs/4_NEXT_VERSION.md`) implemented 2026-06-07** (commit `3317fdc`): search
+input removed, viewport-based station refresh, continuous device-location updates, PROFECO
+inconsistency report. **New signed release built 2026-07-09: versionCode 2 / 1.0.0-alpha02**
+(AAB 6.2 MB, APK 3.7 MB) — ready to upload to Internal Testing. Remaining work is **post-plan
+release work**: upload alpha02 AAB, finish Play Console store listing (privacy policy URL still
+needs publishing — HTML ready at `docs/privacy/index.html`), and submit for Production access.
 
 > **Fix that unblocked tester sign-in (2026-05-31):** Google Play re-signs the AAB with its own key.
 > Registered Google's signing SHA-1 `33:AD:F6:...:C0:BD` in Firebase → sign-in worked for all testers,
 > no rebuild needed. See BUILD_GUIDE §6b.
 
 ## ▶️ Next step (post-plan release sequence)
+
+### 0. Upload alpha02 build to Internal Testing (manual — Play Console)
+- Upload `android/app/build/outputs/bundle/release/app-release.aab` (versionCode 2, built 2026-07-09).
+- Release notes: viewport-based exploration (no more search bar), live location updates, PROFECO report.
 
 ### 1. Complete Play Console store listing
 - Finalize text/assets checklist in `docs/STORE_LISTING.md`.
@@ -84,6 +91,12 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done · 🔵 blocked (needs i
   in firebase-functions-ktx BOM 33 exposes `getData()` returning `Any?`, not a typed generic.
 - **2026-06-07** — Plan verification pass completed: all Phase 1 items in `PLAN.md` map to completed
   checklist entries F1–F11 in this file. Tracker focus switched to post-plan Play Console release work.
+- **2026-06-07** — V-next features landed (`3317fdc`): removed zone/address search input, stations now
+  refresh from the map viewport center as the camera moves, continuous fused-location updates replace
+  one-shot location, and station detail sheet gained a PROFECO report chip (pre-filled email intent).
+- **2026-07-09** — Version bumped to `versionCode 2` / `1.0.0-alpha02`; new signed release AAB + APK
+  built and signature verified against the local release keystore. Store listing description updated
+  to drop the removed search feature and mention viewport exploration + PROFECO reporting.
 
 ## Manual steps completed
 - [x] `firebase login` as ingjrz@gmail.com _(2026-05-30)_

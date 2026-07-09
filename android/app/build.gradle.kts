@@ -25,8 +25,8 @@ android {
         applicationId = "mx.gasappmx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0-alpha01"
+        versionCode = 2
+        versionName = "1.0.0-alpha02"
         // Android Maps SDK key (map display only). Restricted to this package + SHA-1.
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
             providers.gradleProperty("GOOGLE_MAPS_API_KEY")
