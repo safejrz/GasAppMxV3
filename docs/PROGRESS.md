@@ -11,8 +11,8 @@
 input removed, viewport-based station refresh, continuous device-location updates, PROFECO
 inconsistency report. **New signed release built 2026-07-09: versionCode 2 / 1.0.0-alpha02**
 (AAB 6.2 MB, APK 3.7 MB) — ready to upload to Internal Testing. Remaining work is **post-plan
-release work**: upload alpha02 AAB, finish Play Console store listing (privacy policy URL still
-needs publishing — HTML ready at `docs/privacy/index.html`), and submit for Production access.
+release work**: upload alpha02 AAB, finish Play Console store listing (privacy policy **published
+2026-07-09** at https://safejrz.github.io/gasappmx-privacy/), and submit for Production access.
 
 > **Fix that unblocked tester sign-in (2026-05-31):** Google Play re-signs the AAB with its own key.
 > Registered Google's signing SHA-1 `33:AD:F6:...:C0:BD` in Firebase → sign-in worked for all testers,
@@ -26,7 +26,7 @@ needs publishing — HTML ready at `docs/privacy/index.html`), and submit for Pr
 
 ### 1. Complete Play Console store listing
 - Finalize text/assets checklist in `docs/STORE_LISTING.md`.
-- Confirm privacy policy URL is published and matches app behavior.
+- Privacy policy URL for the listing: https://safejrz.github.io/gasappmx-privacy/ (live, verified).
 
 ### 2. Finalize Internal Testing rollout settings
 - Confirm tester groups, country availability, and release notes are set.

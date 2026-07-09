@@ -65,11 +65,11 @@ Free
 
 ## Privacy policy
 
-Pending — needs a public URL. Options:
-- GitHub Pages (free, simple)
-- Google Sites (free, no coding)
+**Published (2026-07-09):** https://safejrz.github.io/gasappmx-privacy/
+Source repo: https://github.com/safejrz/gasappmx-privacy (public — GitHub Pages requires it).
+To update: edit `docs/privacy/index.html` here, then copy it to that repo and push.
 
-Suggested text for the privacy policy page:
+Page text (same as published):
 
 ---
 
@@ -103,7 +103,7 @@ Para cualquier pregunta sobre privacidad: ingjrz@gmail.com
 - [ ] At least 2 phone screenshots uploaded
 - [ ] Short description filled in
 - [ ] Full description filled in
-- [ ] Privacy policy URL added
+- [ ] Privacy policy URL added → use https://safejrz.github.io/gasappmx-privacy/
 - [ ] Content rating questionnaire completed
 - [ ] App category set (Maps & Navigation)
 - [ ] Production access applied for (from Dashboard)
