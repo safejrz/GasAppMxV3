@@ -57,7 +57,7 @@ Free
 
 | Asset | Size | Notes |
 |---|---|---|
-| App icon | 512 × 512 px PNG | High-res, no alpha |
+| App icon | 512 × 512 px PNG | High-res, no alpha — use `docs/icon_512_flat.png` (alpha-free version of `icon_512.png`, generated 2026-07-09) |
 | Feature graphic | 1024 × 500 px PNG | Banner shown at top of listing |
 | Phone screenshots | min 2, max 8 | Use screenshots from the S23 FE |
 

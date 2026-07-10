@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -367,6 +369,7 @@ private fun StationCard(station: GasStation, fuelType: FuelType, onClick: () -> 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StationDetail(
     station: GasStation,
@@ -413,7 +416,7 @@ private fun StationDetail(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = onDismiss, label = { Text("Cerrar") })
                 if (directions == null && !isDirectionsLoading) {
                     AssistChip(onClick = onRequestDirections, label = { Text("Ver ruta exacta") })

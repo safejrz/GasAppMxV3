@@ -20,6 +20,10 @@ release work**: upload alpha02 AAB, finish Play Console store listing (privacy p
 
 ## ▶️ Next step (post-plan release sequence)
 
+> **Asset check (2026-07-09):** listing assets verified — feature graphic 1024×500 ✅, 2 phone
+> screenshots ✅. Original `icon_512.png` has a transparent background (Play rejects alpha);
+> upload the flattened `docs/icon_512_flat.png` instead.
+
 ### 0. Upload alpha02 build to Internal Testing (manual — Play Console)
 - Upload `android/app/build/outputs/bundle/release/app-release.aab` (versionCode 2, built 2026-07-09).
 - Release notes: viewport-based exploration (no more search bar), live location updates, PROFECO report.
